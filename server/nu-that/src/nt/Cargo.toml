@@ -1,0 +1,14 @@
+[package]
+name = "nt"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+# nt-mongodb = { path = "../nt-mongodb" }
+vuln_collector = { path = "../vuln_collector" }
+
+futures = "0.3"
+serde_json = { version = "1.0.83", features = ["std"] }
+tokio = { version = "1.20.1", features = ["full"] }
