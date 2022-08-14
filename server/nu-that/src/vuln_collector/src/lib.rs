@@ -51,18 +51,52 @@ pub async fn extract_osv_json_data(json_byte_data: Vec<u8>) -> Result<Vec<OvfFor
 }
 
 
+// Setup the structure of the returned JSON (Google Bucket Object)
+struct BucketObject {
+    name: String,
+    #[serde(rename = "timeCreated")]
+    time_created: String,
+    updated: String,
+}
+
+// Response of the object list
+struct BucketObjectList {
+    kind: String,
+    #[serde(rename = "nextPageToken")]
+    nextpagetoken: Option<String>,
+    prefixes: Vec<String>,
+    items: Vec<BucketObject>,
+}
 
 // Function should be used for subsequent calls. It will only update files if the modified date is newer than the
 //   last_epoch_update value, or if there are new files with a created time newer than the last_epoch_update value
-// pub async fn check_for_updated_files(package_type: &str, last_epoch_update: i64) -> Result<Vec<OvfFormat>, Error> {
+pub async fn check_for_updated_files(package_type: &str, last_epoch_update: i64) -> Result<Vec<OvfFormat>, Error> {
 
-//     let current_datetime: i64 = Utc::now().timestamp();
+    let url: String = [BASE_API_URL, BUCKET_NAME, "o", package_type, "?fields=name,timeCreated,updated"].join("/");
+    let current_datetime: i64 = Utc::now().timestamp();
+    let mut resultlist, itemresults = Vec::new();
 
-//     if current_datetime > last_epoch_update {
+    // Retrieve a list of objects
+    fn retrieve_list(url: String, next_token: Option<String>) -> Option<String> {
+        let response = reqwest::get(url).await?;
+        let objlist: BucketObjectList = from_str(response)?;
 
-//     // First check to see if anything was modified
-    
+        for item in objlist.items {
+            epoch_time_created = DataTime::parse_from_rfc2822(item.time_created);
+            epoch_time_updated = DateTime::parse_from_rfc2822(item.updated);
+            if (current_datetime > epoch_time_created) ||
+                 (current_datetime > epoch_time_updated) {
+                    resultlist.push(&item.name);
+                    println!(&item.name);
+            }
+        }
+        Some(objlist.nextpagetoken)
+    }
 
-//     }
+    fn retrieve_obj_from_list(url: String) {
+        for item in resultlist {
+            let response = reqwest::get(url)
+        }
+    }
 
-// }
+}
