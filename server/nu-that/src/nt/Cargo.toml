@@ -9,6 +9,7 @@ edition = "2021"
 # nt-mongodb = { path = "../nt-mongodb" }
 vuln_collector = { path = "../vuln_collector" }
 
+chrono = "0.4.22"
 futures = "0.3"
 serde_json = { version = "1.0.83", features = ["std"] }
 tokio = { version = "1.20.1", features = ["full"] }
