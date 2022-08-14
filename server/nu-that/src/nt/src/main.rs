@@ -6,5 +6,16 @@ use serde_json::json;
 async fn main() {
     let json_data = block_on(extract_osv_json_data("PyPI"));
 
-    // println!("{:?}", json!(json_data.iter().last()));
+    match json_data {
+        Ok(v) => {
+            for i in v.iter() {
+                println!("Data: {:?}", i);
+            }
+        },
+        Err(e) => println!("error: {e:?}"),
+    }
+    
+    // for i in json_data.iter() {
+    //     println!("Data: {:?}", i);
+    // }
 }

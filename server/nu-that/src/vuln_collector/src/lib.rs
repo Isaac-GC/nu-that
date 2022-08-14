@@ -1,8 +1,10 @@
-use zip::ZipArchive;
-use serde_json::{from_reader, Value, json};
-// use crate::ovf_schema::OvfFormat;
+use std::io::Read;
 
-// mod ovf_schema;
+use zip::ZipArchive;
+use serde_json::from_str;
+use crate::ovf_schema::OvfFormat;
+
+mod ovf_schema;
 
 type Error = Box<dyn std::error::Error>;
 
@@ -15,51 +17,24 @@ async fn fetch_osv_vuln_list(package_type: &str) -> Result<Vec<u8>, Error> {
     Ok(buffer)
 }
 
-pub async fn extract_osv_json_data(package_type: &str) -> Result<Vec<Value>, Error> {
+pub async fn extract_osv_json_data(package_type: &str) -> Result<Vec<OvfFormat>, Error> {
     let json_byte_data = fetch_osv_vuln_list(package_type).await?;
     let reader = std::io::Cursor::new(&json_byte_data);
     let mut archive = ZipArchive::new(reader).unwrap();
     let mut json_vec = Vec::new();
-    
-    let mut a = 0;
+
 
     for i in 0..archive.len() {
-        let mut json_data = archive.by_index(i).unwrap();
-        json_vec.push(from_reader(&mut json_data)?);
-        // println!("{:?}",from_reader(&mut json_data)?);
+        let mut zip_file = archive.by_index(i).unwrap(); 
+        let mut jd_buffer = String::new();
 
-        if a <= 1 {
-            a += 1 ; 
-            println!("{:?}", json!(from_reader(&mut json_data)?));
-        }
+        zip_file.read_to_string(&mut jd_buffer)?;
+        let mut ovfdoc: OvfFormat = from_str(&jd_buffer)?;
 
-        // OLD -- Mark for deletion
-        // This will probably be never used as the vuln data from
-        //    the osv-vulnerabilities has a flat data structure
-        // let outpath = match file.enclosed_name() {
-        //     Some(path) => path.to_owned(),
-        //     None => continue,
-        // };        
-        // if (*file.name()).ends_with('/') {
-        //     fs::create_dir_all(&outpath).unwrap();
-        // }
-
-        // if let Some(p) = outpath.parent() {
-        //     if !p.exists() {
-        //         fs::create_dir_all(&p).unwrap();
-        //     }
-        //     let mut outfile = fs::File::create(&outpath).unwrap();
-        //     io::copy(&mut file, &mut outfile).unwrap();
-        // }
-
+        // println!("{:?}", &ovfdoc);
+        json_vec.push(ovfdoc);
+        
     }
+
     Ok(json_vec)
 }
-
-// async fn fetch_url(url: String, file_name: String) -> Result<()> {
-//     let response = reqwest::get(url).await?;
-//     let mut file = std::fs::File::create(file_name)?;
-//     let mut content =  Cursor::new(response.bytes().await?);
-//     std::io::copy(&mut content, &mut file)?;
-//     Ok(())
-// }
