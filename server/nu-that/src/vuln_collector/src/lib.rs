@@ -1,5 +1,7 @@
 use std::io::Read;
 
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use zip::ZipArchive;
 use serde_json::from_str;
 use crate::ovf_schema::OvfFormat;
@@ -50,7 +52,7 @@ pub async fn extract_osv_json_data(json_byte_data: Vec<u8>) -> Result<Vec<OvfFor
     Ok(json_vec)
 }
 
-
+#[derive(Debug, Serialize, Deserialize)]
 // Setup the structure of the returned JSON (Google Bucket Object)
 struct BucketObject {
     name: String,
@@ -59,6 +61,7 @@ struct BucketObject {
     updated: String,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
 // Response of the object list
 struct BucketObjectList {
     kind: String,
@@ -74,29 +77,51 @@ pub async fn check_for_updated_files(package_type: &str, last_epoch_update: i64)
 
     let url: String = [BASE_API_URL, BUCKET_NAME, "o", package_type, "?fields=name,timeCreated,updated"].join("/");
     let current_datetime: i64 = Utc::now().timestamp();
-    let mut resultlist, itemresults = Vec::new();
+    let resultlist: Vec<BucketObjectList> = Vec::new();
+    let itemresults: Vec<OvfFormat> = Vec::new();
 
-    // Retrieve a list of objects
-    fn retrieve_list(url: String, next_token: Option<String>) -> Option<String> {
-        let response = reqwest::get(url).await?;
-        let objlist: BucketObjectList = from_str(response)?;
+    // Retrieve a list of objects and returns a list of Strings for files that need to be updated
+    async fn retrieve_list(url: String, next_token: Option<String>, current_datetime: i64) -> Result<Vec<String>, Error> {
+        let mut templist: Vec<String> = Vec::new();
+        let mut objlist: BucketObjectList = Vec::new();
+        let mut token_present = true;
+
+        while token_present {
+            let response = reqwest::get(url).await?.text().await?;
+            let objects  = from_str(&response)?;
+            let mut token_present: bool = true;
+            objlist.push(objects);
+            
+            if let None = objects.nextpagetoken { break; }
+        }
 
         for item in objlist.items {
-            epoch_time_created = DataTime::parse_from_rfc2822(item.time_created);
-            epoch_time_updated = DateTime::parse_from_rfc2822(item.updated);
+            let epoch_time_created = DateTime::parse_from_rfc2822(&item.time_created)?.timestamp();
+            let epoch_time_updated = DateTime::parse_from_rfc2822(&item.updated)?.timestamp();
             if (current_datetime > epoch_time_created) ||
                  (current_datetime > epoch_time_updated) {
-                    resultlist.push(&item.name);
-                    println!(&item.name);
+                    println!("{}", item.name);
+                    templist.push(item.name);
             }
         }
-        Some(objlist.nextpagetoken)
+        return Ok(templist)
     }
 
-    fn retrieve_obj_from_list(url: String) {
-        for item in resultlist {
-            let response = reqwest::get(url)
+    // Uses a list of Strings to automatically download files and then return 
+    //   a list of formatted documents to be consumed
+    async fn retrieve_obj_from_list(templist: Vec<String>) -> Result<Vec<OvfFormat>, Error>{
+        let result_list: Vec<OvfFormat> = Vec::new();
+        let mut url = [BASE_API_URL, BUCKET_NAME, "o"].join("/");
+        for item in templist {
+            url += &format!("/{}?alt=media", &item);
+            let response: String = reqwest::get(&url).await?.text().await?;
+
+            let ovfdoc: OvfFormat = from_str(&response)?;
+            println!("{:?}", ovfdoc.id);            
         }
+
+        Ok(result_list)
     }
 
+    Ok(itemresults)
 }
