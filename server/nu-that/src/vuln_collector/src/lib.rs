@@ -77,31 +77,34 @@ pub async fn check_for_updated_files(package_type: &str, last_epoch_update: i64)
 
     let url: String = [BASE_API_URL, BUCKET_NAME, "o", package_type, "?fields=name,timeCreated,updated"].join("/");
     let current_datetime: i64 = Utc::now().timestamp();
-    let resultlist: Vec<BucketObjectList> = Vec::new();
-    let itemresults: Vec<OvfFormat> = Vec::new();
+    let resultlist: Vec<String> = retrieve_list(url, current_datetime).await?;
+    let itemresults: Vec<OvfFormat> = retrieve_obj_from_list(resultlist).await?;
+
+    
 
     // Retrieve a list of objects and returns a list of Strings for files that need to be updated
-    async fn retrieve_list(url: String, next_token: Option<String>, current_datetime: i64) -> Result<Vec<String>, Error> {
+    async fn retrieve_list(url: String, current_datetime: i64) -> Result<Vec<String>, Error> {
         let mut templist: Vec<String> = Vec::new();
-        let mut objlist: BucketObjectList = Vec::new();
-        let mut token_present = true;
+        let mut objlist: Vec<BucketObjectList> = Vec::new();
+        // let mut token_present = true;
 
-        while token_present {
+        // while token_present {
             let response = reqwest::get(url).await?.text().await?;
-            let objects  = from_str(&response)?;
-            let mut token_present: bool = true;
+            let objects: BucketObjectList  = from_str(&response)?;
+            // let mut token_present: bool = true;
             objlist.push(objects);
             
-            if let None = objects.nextpagetoken { break; }
-        }
+        //     if let None = objects.nextpagetoken { break; }
+        // }
 
-        for item in objlist.items {
-            let epoch_time_created = DateTime::parse_from_rfc2822(&item.time_created)?.timestamp();
-            let epoch_time_updated = DateTime::parse_from_rfc2822(&item.updated)?.timestamp();
-            if (current_datetime > epoch_time_created) ||
-                 (current_datetime > epoch_time_updated) {
-                    println!("{}", item.name);
-                    templist.push(item.name);
+        for obj in objlist.iter() {
+            for item in obj.items.iter() {
+                let epoch_time_created = DateTime::parse_from_rfc2822(&item.time_created)?.timestamp();
+                let epoch_time_updated = DateTime::parse_from_rfc2822(&item.updated)?.timestamp();
+                if (current_datetime > epoch_time_created) ||
+                    (current_datetime > epoch_time_updated) {
+                        templist.push(item.name.to_string());
+                }
             }
         }
         return Ok(templist)
@@ -110,18 +113,20 @@ pub async fn check_for_updated_files(package_type: &str, last_epoch_update: i64)
     // Uses a list of Strings to automatically download files and then return 
     //   a list of formatted documents to be consumed
     async fn retrieve_obj_from_list(templist: Vec<String>) -> Result<Vec<OvfFormat>, Error>{
-        let result_list: Vec<OvfFormat> = Vec::new();
+        let mut result_list: Vec<OvfFormat> = Vec::new();
         let mut url = [BASE_API_URL, BUCKET_NAME, "o"].join("/");
         for item in templist {
             url += &format!("/{}?alt=media", &item);
             let response: String = reqwest::get(&url).await?.text().await?;
 
             let ovfdoc: OvfFormat = from_str(&response)?;
-            println!("{:?}", ovfdoc.id);            
+            result_list.push(ovfdoc); 
         }
 
         Ok(result_list)
     }
+
+
 
     Ok(itemresults)
 }

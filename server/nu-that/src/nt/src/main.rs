@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use vuln_collector::{extract_osv_json_data, fetch_osv_vuln_list_zip};
+use vuln_collector::{extract_osv_json_data, fetch_osv_vuln_list_zip, check_for_updated_files};
 use futures::executor::block_on;
 use serde_json::json;
 
@@ -7,10 +7,14 @@ use serde_json::json;
 async fn main() {
 
     // Before retrieving a value, set the local epoch value to check for future updates.
-    let dt: i64 = Utc::now().timestamp();
+    let dt: i64 = Utc::now().timestamp() - 100000;
 
     let json_bytes = fetch_osv_vuln_list_zip("PyPI").await;
+    let upfiles    = check_for_updated_files("PyPI", dt).await;
 
+    for i in upfiles.iter() {
+        println!("{:?}", i);
+    }
     // match json_bytes {
     //     Ok(jb) => json_data = Some(extract_osv_json_data(jb).await),
     //     Err(e) => println!("Error: {e:?}"),
